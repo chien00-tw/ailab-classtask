@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>班級任務進度牆 v3.0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Chakra+Petch:wght@700&family=Fredoka:wght@600;700&display=swap');
+    
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: #050814;
+      color: #f8fafc;
+      user-select: none;
+      overflow-x: hidden;
+      touch-action: manipulation;
+    }
+
+    .font-num {
+      font-family: 'Chakra Petch', 'Noto Sans TC', monospace;
+    }
+
+    .font-fun {
+      font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+    }
+
+    /* Custom Cyber Deck Scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #090d1a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 6px;
+      border: 1px solid #475569;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3b82f6;
+    }
+
+    /* High-contrast Glassmorphism & Neon Cards for iPad & Big Screen */
+    .glass-card {
+      background: rgba(13, 22, 40, 0.96);
+      border: 2px solid rgba(59, 130, 246, 0.4);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.7);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .glass-card:hover {
+      border-color: rgba(96, 165, 250, 0.85);
+      box-shadow: 0 0 25px rgba(59, 130, 246, 0.35);
+    }
+
+    .glass-card-complete {
+      background: rgba(6, 78, 59, 0.6) !important;
+      border-color: #34d399 !important;
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.45) !important;
+    }
+
+    .stat-pill {
+      background: rgba(10, 16, 32, 0.98);
+      border: 2px solid rgba(59, 130, 246, 0.6);
+      backdrop-filter: blur(10px);
+    }
+
+    .editable-active {
+      outline: 3px dashed #fbbf24 !important;
+      outline-offset: 3px;
+      cursor: text !important;
+      background: rgba(245, 158, 11, 0.3) !important;
+      border-radius: 8px;
+    }
+
+    /* Big iPad Touch Targets */
+    .touch-target {
+      min-height: 48px;
+      touch-action: manipulation;
+    }
+
+    /* Pseudo-fullscreen support for iframe restrictions */
+    .pseudo-fullscreen-mode {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 99999 !important;
+      background: #050814 !important;
+      padding: 1.25rem !important;
+      overflow-y: auto !important;
+    }
+  </style>
+</head>
+<body id="app-body" class="min-h-screen flex flex-col justify-between p-3 lg:p-5 select-none bg-[#050814]">
+
+  <!-- Top Navigation / Control Header -->
+  <header class="glass-card rounded-2xl p-4 mb-3 flex flex-col md:flex-row items-center md:items-start xl:items-center justify-between gap-4 border-2 border-blue-500/40">
+    <!-- Left Column: Title, Date & Icon Action Buttons -->
+    <div class="flex flex-col items-center md:items-start gap-3 w-full md:w-auto">
+      <!-- Main Title + Date + Pure Icon Buttons -->
+      <div class="flex items-center gap-3 flex-wrap justify-center md:justify-start">
+        <h1 class="text-2xl lg:text-3xl font-black tracking-wide text-white flex items-center gap-2.5">
+          <i class="fa-solid fa-layer-group text-sky-400"></i>
+          <span>班級任務進度牆</span>
+        </h1>
+        <span class="bg-blue-900/90 text-sky-200 text-xs font-black px-3 py-1 rounded-full border border-blue-400/60 shadow-sm">v3.0</span>
+        
+        <!-- Current Date (Year / Month / Day) -->
+        <div class="bg-slate-900 text-amber-300 text-sm sm:text-base font-black px-3.5 py-1.5 rounded-xl border-2 border-amber-500/50 flex items-center gap-2 shadow-md">
+          <i class="fa-regular fa-calendar-days text-amber-400"></i>
+          <span id="current-date-text">2026年08月30日</span>
+        </div>
+
+        <!-- Action Icon-Only Buttons -->
+        <div class="flex items-center gap-2 ml-1">
+          <!-- Adjust Student Count Button -->
+          <button onclick="openStudentCountModal()" title="調整班級人數" aria-label="調整班級人數"
+            class="w-11 h-11 bg-indigo-950/90 hover:bg-indigo-700 text-indigo-100 active:scale-90 text-lg font-bold rounded-2xl border-2 border-indigo-500/70 transition flex items-center justify-center shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 touch-target">
+            <i class="fa-solid fa-users-gear"></i>
+          </button>
+
+          <!-- Fullscreen Toggle Button -->
+          <button id="fullscreen-btn" onclick="toggleFullscreen()" title="全螢幕模式" aria-label="全螢幕模式"
+            class="w-11 h-11 bg-blue-950/90 hover:bg-blue-700 text-blue-100 active:scale-90 text-lg font-bold rounded-2xl border-2 border-blue-500/70 transition flex items-center justify-center shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-400 touch-target">
+            <i id="fullscreen-icon" class="fa-solid fa-expand"></i>
+          </button>
+          
+          <!-- Edit Mode Toggle Button -->
+          <button id="edit-mode-btn" onclick="toggleEditMode()" title="編修模式" aria-label="編修模式"
+            class="w-11 h-11 bg-amber-950/90 hover:bg-amber-600 text-amber-100 active:scale-90 text-lg font-bold rounded-2xl border-2 border-amber-500/70 transition flex items-center justify-center shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400 touch-target">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          
+          <!-- Reset Storage Button -->
+          <button onclick="openResetModal()" title="清空作業紀錄" aria-label="清空作業紀錄"
+            class="w-11 h-11 bg-rose-950/90 hover:bg-rose-700 text-rose-100 active:scale-90 text-lg font-bold rounded-2xl border-2 border-rose-500/70 transition flex items-center justify-center shadow-lg focus:outline-none focus:ring-2 focus:ring-rose-400 touch-target">
+            <i class="fa-solid fa-rotate-left"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Big Completion Rate & Big Clock -->
+    <div class="flex items-center justify-stretch sm:justify-end gap-3 w-full md:w-auto">
+      <!-- Full Class Completion Rate -->
+      <div id="class-rate-card" class="stat-pill flex-1 sm:flex-initial px-6 py-2.5 rounded-2xl flex flex-col justify-center min-w-[180px] lg:min-w-[220px] border-2 border-blue-500/60 transition-all duration-300">
+        <div class="text-xs sm:text-sm text-blue-300 font-black flex items-center gap-1.5 justify-end">
+          <i class="fa-solid fa-chart-line text-blue-400"></i> 全班完成率
+        </div>
+        <div class="text-4xl lg:text-5xl font-black text-sky-400 font-num tracking-tight flex items-baseline justify-end mt-0.5">
+          <span id="class-rate-text">0</span>
+          <span class="text-2xl font-bold text-sky-300 ml-1">%</span>
+        </div>
+      </div>
+
+      <!-- Current Time Section -->
+      <div class="stat-pill flex-1 sm:flex-initial px-6 py-2.5 rounded-2xl flex flex-col justify-center min-w-[170px] lg:min-w-[210px] border-2 border-amber-500/60">
+        <div class="text-xs sm:text-sm text-amber-200/90 font-black flex items-center gap-1.5 justify-end">
+          <i class="fa-regular fa-clock text-amber-400"></i> 目前時間
+        </div>
+        <div id="clock-display" class="text-4xl lg:text-5xl font-num font-black text-amber-300 tracking-wider text-right mt-0.5">
+          07:39
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Grid Matrix Container -->
+  <main class="flex-1 my-1">
+    <!-- Top Edit Bar Controls -->
+    <div id="edit-banner" class="hidden glass-card mb-3 p-3.5 rounded-2xl border-2 border-amber-500/80 bg-amber-950/50 text-amber-100 text-sm flex flex-wrap items-center justify-between gap-3 shadow-xl">
+      <div class="flex items-center gap-2 font-black text-base">
+        <i class="fa-solid fa-circle-exclamation text-amber-400 text-xl animate-bounce"></i>
+        <span>編修模式已啟動：點擊各卡片座號或名稱可直接修改內容！</span>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <button onclick="openStudentCountModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl border border-indigo-400 transition flex items-center gap-2 shadow-md touch-target">
+          <i class="fa-solid fa-users-gear"></i> 批次設定人數 (<span id="banner-student-count">21</span>人)
+        </button>
+        <button onclick="addStudent()" class="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs rounded-xl border border-amber-300 transition flex items-center gap-1.5 shadow-md touch-target">
+          <i class="fa-solid fa-user-plus"></i> +1人
+        </button>
+        <button onclick="removeLastStudent()" class="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl border border-rose-300 transition flex items-center gap-1.5 shadow-md touch-target">
+          <i class="fa-solid fa-user-minus"></i> -1人
+        </button>
+      </div>
+    </div>
+
+    <!-- Dynamic Grid for 10~12 y/o students on iPad & Smart Screen -->
+    <div id="student-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3.5">
+      <!-- Dynamically Rendered by JS -->
+    </div>
+  </main>
+
+  <!-- Bottom Control Panel / Task Drawer -->
+  <footer class="mt-3 glass-card rounded-2xl p-4 border-2 border-blue-800/60 relative">
+    <!-- Top Lock Indicator Bar in Drawer -->
+    <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800/90 flex-wrap gap-2">
+      <div class="flex items-center gap-2.5">
+        <span class="text-xs sm:text-sm font-black px-3 py-1.5 rounded-xl flex items-center gap-2 border-2"
+              id="lock-status-badge">
+          <!-- Rendered by JS -->
+        </span>
+        <span class="text-xs text-slate-400 font-medium hidden sm:inline" id="lock-status-hint">
+          防誤觸鎖定已啟動：防止學生操作大屏或平板時更動今日作業清單。
+        </span>
+      </div>
+
+      <!-- Master Lock/Unlock Switch -->
+      <button id="task-lock-btn" onclick="toggleTaskPanelLock()"
+              class="px-4 py-2 text-xs sm:text-sm font-black rounded-xl transition flex items-center gap-2 shadow-md active:scale-95 focus:outline-none touch-target">
+        <i id="task-lock-icon" class="fa-solid fa-lock"></i>
+        <span id="task-lock-text">解鎖編輯任務</span>
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      
+      <!-- Left: Today's Active Tasks -->
+      <div class="lg:col-span-5 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-slate-800/90 pr-0 lg:pr-5 pb-4 lg:pb-0">
+        <div>
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 class="text-base sm:text-lg font-black text-sky-300 flex items-center gap-2">
+              <i class="fa-solid fa-list-check text-sky-400"></i> 今日任務
+            </h3>
+            <div class="flex items-center gap-2">
+              <button id="btn-clear-today" onclick="guardedClearTodayTasks()" 
+                class="px-3.5 py-2 bg-rose-950 hover:bg-rose-800 text-rose-200 text-xs font-black rounded-xl border border-rose-700/60 transition disabled:opacity-40 disabled:cursor-not-allowed touch-target">
+                清空今日清單
+              </button>
+              <button id="btn-unselect-all" onclick="guardedUnselectAllTasks()" 
+                class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-black rounded-xl border border-slate-600 transition disabled:opacity-40 disabled:cursor-not-allowed touch-target">
+                取消選取
+              </button>
+              <button id="btn-select-all" onclick="guardedSelectAllTasks()" 
+                class="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg border border-blue-400 transition disabled:opacity-40 disabled:cursor-not-allowed touch-target">
+                全部選取
+              </button>
+            </div>
+          </div>
+
+          <!-- Active Today's Task List Container -->
+          <div id="today-tasks-container" class="flex flex-wrap gap-2.5 min-h-[58px] p-3 bg-slate-950/90 rounded-2xl border-2 border-slate-800/90 items-center">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <div id="empty-tasks-tip" class="text-xs sm:text-sm text-slate-400 mt-2 font-bold italic flex items-center gap-2">
+          <i class="fa-solid fa-arrow-right text-sky-400 animate-pulse"></i> 請點選右側資源庫，將作業加入今日任務...
+        </div>
+      </div>
+
+      <!-- Right: Task Library Pool -->
+      <div class="lg:col-span-7 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 class="text-base sm:text-lg font-black text-slate-100 flex items-center gap-2">
+              <i class="fa-solid fa-boxes-stacked text-amber-400"></i> 任務資源庫 <span class="text-xs font-normal text-slate-400">(點擊加入今日任務)</span>
+            </h3>
+            <!-- Add Custom Task Input -->
+            <div class="flex items-center gap-2">
+              <input id="custom-task-input" type="text" placeholder="新增自訂作業..." 
+                     class="bg-slate-900 text-xs sm:text-sm border-2 border-slate-700 text-slate-100 px-3.5 py-2 rounded-xl focus:outline-none focus:border-sky-400 w-36 sm:w-48 placeholder-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                     onkeydown="if(event.key==='Enter') guardedAddCustomTask()">
+              <button id="btn-add-custom" onclick="guardedAddCustomTask()" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white text-xs sm:text-sm font-black rounded-xl transition shadow-lg border border-sky-400 disabled:opacity-40 disabled:cursor-not-allowed touch-target">
+                + 新增
+              </button>
+            </div>
+          </div>
+
+          <!-- Preset Task Buttons with Large Touch Area -->
+          <div id="preset-library-container" class="flex flex-wrap gap-2.5 max-h-[135px] overflow-y-auto pr-1 py-1">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- Page Bottom Center Subtitle Credit -->
+  <div class="w-full text-center py-2.5 mt-2">
+    <div class="inline-flex items-center justify-center gap-2.5 px-5 py-2 rounded-full bg-slate-900/90 border border-slate-700/80 text-xs sm:text-sm font-black tracking-wider text-slate-400 shadow-inner">
+      <span class="text-sky-400 font-black">班級百寶箱</span>
+      <span class="text-slate-600">|</span>
+      <span class="text-emerald-300 font-black">Design：S.C. Kuo</span>
+    </div>
+  </div>
+
+  <!-- Adjust Student Count Modal (20 ~ 26 Presets & 1~50 Custom) -->
+  <div id="student-count-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-card max-w-md w-full p-6 rounded-3xl border-2 border-indigo-500/70 shadow-2xl">
+      <div class="flex items-center gap-3 text-indigo-400 mb-3">
+        <i class="fa-solid fa-users-gear text-3xl"></i>
+        <h2 class="text-xl font-black text-white">調整班級人數</h2>
+      </div>
+      <p class="text-sm text-slate-300 mb-4 leading-relaxed font-bold">
+        可直接輸入班級座號總人數，或點選下方常用班級規模快速套用（調整後將完整保留現有作業勾選狀態）：
+      </p>
+
+      <!-- Quick Preset Buttons (20 ~ 26 人) -->
+      <div class="flex flex-wrap gap-2 mb-4">
+        <button onclick="setQuickCount(20)" class="px-3.5 py-2 bg-slate-800 hover:bg-indigo-600 text-slate-200 text-xs font-black rounded-xl border border-slate-700 transition touch-target">20 人</button>
+        <button onclick="setQuickCount(21)" class="px-3.5 py-2 bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-black rounded-xl border-2 border-indigo-400 transition shadow-md touch-target">21 人 (預設)</button>
+        <button onclick="setQuickCount(22)" class="px-3.5 py-2 bg-slate-800 hover:bg-indigo-600 text-slate-200 text-xs font-black rounded-xl border border-slate-700 transition touch-target">22 人</button>
+        <button onclick="setQuickCount(23)" class="px-3.5 py-2 bg-slate-800 hover:bg-indigo-600 text-slate-200 text-xs font-black rounded-xl border border-slate-700 transition touch-target">23 人</button>
+        <button onclick="setQuickCount(24)" class="px-3.5 py-2 bg-slate-800 hover:bg-indigo-600 text-slate-200 text-xs font-black rounded-xl border border-slate-700 transition touch-target">24 人</button>
+        <button onclick="setQuickCount(25)" class="px-3.5 py-2 bg-slate-800 hover:bg-indigo-600 text-slate-200 text-xs font-black rounded-xl border border-slate-700 transition touch-target">25 人</button>
+        <button onclick="setQuickCount(26)" class="px-3.5 py-2 bg-slate-800 hover:bg-indigo-600 text-slate-200 text-xs font-black rounded-xl border border-slate-700 transition touch-target">26 人</button>
+      </div>
+
+      <!-- Numeric Input -->
+      <div class="flex items-center gap-3 mb-6">
+        <label for="student-count-input" class="text-sm font-black text-slate-200 whitespace-nowrap">自訂人數 (1~50)：</label>
+        <input id="student-count-input" type="number" min="1" max="50" value="21"
+               class="bg-slate-900 border-2 border-indigo-500 text-indigo-200 font-num font-black text-xl px-4 py-2.5 rounded-2xl focus:outline-none focus:border-indigo-400 w-28 text-center">
+      </div>
+
+      <div class="flex justify-end gap-3">
+        <button onclick="closeStudentCountModal()" class="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-xs rounded-2xl transition touch-target">
+          取消
+        </button>
+        <button onclick="applyStudentCount()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-2xl shadow-lg shadow-indigo-900/50 border border-indigo-400 transition touch-target">
+          確認變更
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset Confirmation Modal -->
+  <div id="reset-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-card max-w-md w-full p-6 rounded-3xl border-2 border-rose-500/70 shadow-2xl">
+      <div class="flex items-center gap-3 text-rose-400 mb-3">
+        <i class="fa-solid fa-triangle-exclamation text-3xl"></i>
+        <h2 class="text-xl font-black text-white">清空作業紀錄？</h2>
+      </div>
+      <p id="reset-modal-desc" class="text-sm text-slate-300 mb-6 leading-relaxed font-bold">
+        這將重設全班所有座號的作業勾選狀態。建議在新的一天或新的一週開始時使用。
+      </p>
+      <div class="flex justify-end gap-3">
+        <button onclick="closeResetModal()" class="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-xs rounded-2xl transition touch-target">
+          取消
+        </button>
+        <button onclick="confirmResetAll()" class="px-5 py-3 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-2xl shadow-lg shadow-rose-900/50 border border-rose-400 transition touch-target">
+          確定清空
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Capsule -->
+  <div id="toast-message" class="fixed bottom-6 right-6 bg-sky-600 text-white text-sm sm:text-base font-black px-5 py-3.5 rounded-2xl shadow-2xl border-2 border-sky-300 transition-all duration-300 opacity-0 transform translate-y-4 pointer-events-none z-50 flex items-center gap-3">
+    <i class="fa-solid fa-circle-check text-sky-200 text-lg"></i>
+    <span id="toast-text">系統訊息</span>
+  </div>
+
+  <script>
+    // System State Management (v3.0 Architecture)
+    const DEFAULT_STUDENT_COUNT = 21;
+    
+    const defaultPresetTasks = [
+      "圈詞", "數習", "作文", "甲本", "乙本", "學習單", 
+      "聯絡簿", "通知單回條", "國語練習單", "數學練習單", 
+      "生活札記", "數重本", "考卷訂正", "閱讀心得"
+    ];
+
+    let state = {
+      version: "v3.0",
+      isEditMode: false,
+      isTaskPanelLocked: true,
+      totalStudents: DEFAULT_STUDENT_COUNT,
+      presetTasks: [...defaultPresetTasks],
+      todayTasks: [],
+      students: [],
+      hasPlayed100Celebration: false // Tracks completion audio trigger
+    };
+
+    // Synthesized Celebratory Chime Sound using Web Audio API (No External Audio Files Needed)
+    function playJoyfulCelebrationSound() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        
+        if (ctx.state === 'suspended') {
+          ctx.resume();
+        }
+
+        // Upbeat celebratory arpeggio notes (C5, E5, G5, C6, G5, C6)
+        const notes = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50, 1318.51];
+        const noteDuration = 0.12;
+
+        notes.forEach((freq, index) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc.type = index % 2 === 0 ? 'triangle' : 'sine';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + index * noteDuration);
+
+          gain.gain.setValueAtTime(0.01, ctx.currentTime + index * noteDuration);
+          gain.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + index * noteDuration + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + index * noteDuration + noteDuration * 1.5);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc.start(ctx.currentTime + index * noteDuration);
+          osc.stop(ctx.currentTime + index * noteDuration + noteDuration * 1.6);
+        });
+      } catch (err) {
+        console.warn('AudioContext playback error:', err);
+      }
+    }
+
+    // Trigger full screen confetti burst
+    function triggerCelebrationEffects() {
+      playJoyfulCelebrationSound();
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 150,
+          spread: 90,
+          origin: { y: 0.6 }
+        });
+        setTimeout(() => {
+          confetti({
+            particleCount: 80,
+            angle: 60,
+            spread: 60,
+            origin: { x: 0 }
+          });
+          confetti({
+            particleCount: 80,
+            angle: 120,
+            spread: 60,
+            origin: { x: 1 }
+          });
+        }, 300);
+      }
+      showToast("🎉 太棒了！全班所有任務已 100% 全部完成！");
+    }
+
+    // System Startup Initializer
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      initClock();
+      renderAll();
+    });
+
+    // Real-time Clock & Date Timer (HH:mm & YYYY年MM月DD日)
+    function initClock() {
+      const updateClock = () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hrs = String(now.getHours()).padStart(2, '0');
+        const mins = String(now.getMinutes()).padStart(2, '0');
+
+        const clockEl = document.getElementById('clock-display');
+        if (clockEl) clockEl.textContent = `${hrs}:${mins}`;
+        
+        const dateEl = document.getElementById('current-date-text');
+        if (dateEl) dateEl.textContent = `${year}年${month}月${day}日`;
+      };
+      updateClock();
+      setInterval(updateClock, 1000);
+    }
+
+    // Load State from LocalStorage
+    function loadState() {
+      const saved = localStorage.getItem('classTaskState_v3.0');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && Array.isArray(parsed.students) && parsed.students.length > 0) {
+            state = parsed;
+            state.isEditMode = false;
+            state.isTaskPanelLocked = true;
+            state.hasPlayed100Celebration = false;
+            state.students.forEach(s => {
+              if (s.name && s.name.includes("學生")) {
+                s.name = s.name.replace(/學生\s*/g, '');
+              }
+            });
+            state.totalStudents = state.students.length;
+            return;
+          }
+        } catch (e) {
+          console.warn('Could not parse saved state, rebuilding defaults.', e);
+        }
+      }
+      
+      generateDefaultStudents(DEFAULT_STUDENT_COUNT);
+      saveState();
+    }
+
+    function generateDefaultStudents(count) {
+      state.totalStudents = count;
+      state.students = Array.from({ length: count }, (_, i) => ({
+        id: i + 1,
+        number: String(i + 1).padStart(2, '0'),
+        name: `${i + 1}號`,
+        completedTasks: []
+      }));
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem('classTaskState_v3.0', JSON.stringify(state));
+      } catch (e) {
+        console.error('LocalStorage save failed:', e);
+      }
+    }
+
+    // Master Render Function
+    function renderAll() {
+      renderStudentGrid();
+      renderTodayTasks();
+      renderPresetLibrary();
+      updateProgressMetrics();
+      updateEditBanner();
+      updateTaskLockUI();
+    }
+
+    function renderStudentGrid() {
+      const grid = document.getElementById('student-grid');
+      grid.innerHTML = '';
+
+      state.students.forEach((student, index) => {
+        const totalToday = state.todayTasks.length;
+        const completedCount = student.completedTasks.filter(t => state.todayTasks.includes(t)).length;
+        const rate = totalToday > 0 ? Math.round((completedCount / totalToday) * 100) : 0;
+        const isAllDone = totalToday > 0 && rate === 100;
+
+        const card = document.createElement('div');
+        card.className = `glass-card rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 relative ${isAllDone ? 'glass-card-complete' : ''}`;
+        
+        let tasksHtml = '';
+        if (totalToday === 0) {
+          tasksHtml = `<div class="text-xs sm:text-sm text-slate-500 font-black my-3 text-center py-3 bg-slate-950/70 rounded-xl border border-slate-800">待機中</div>`;
+        } else {
+          tasksHtml = `<div class="flex flex-wrap gap-2 my-2.5">`;
+          state.todayTasks.forEach(taskName => {
+            const isDone = student.completedTasks.includes(taskName);
+            tasksHtml += `
+              <button onclick="toggleStudentTask(${student.id}, '${taskName}')" 
+                class="px-3 py-2 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 active:scale-95 touch-target shadow-sm ${
+                  isDone 
+                    ? 'bg-emerald-400 text-slate-950 font-black shadow-lg shadow-emerald-950 border border-emerald-300' 
+                    : 'bg-slate-800/95 text-slate-200 hover:bg-slate-700 border-2 border-slate-700/80 hover:border-sky-400'
+                }">
+                <i class="fa-solid ${isDone ? 'fa-check-double text-slate-950 text-xs' : 'fa-square text-slate-500 text-xs'}"></i>
+                <span>${taskName}</span>
+              </button>
+            `;
+          });
+          tasksHtml += `</div>`;
+        }
+
+        const editableClass = state.isEditMode ? 'editable-active' : '';
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
+              <span class="font-num text-base sm:text-lg font-black text-slate-300 ${editableClass}" 
+                    data-field="number" data-index="${index}" 
+                    contenteditable="${state.isEditMode}" 
+                    onblur="updateStudentText(event, ${index}, 'number')">${student.number}</span>
+              
+              <span class="text-base sm:text-lg font-black ${isAllDone ? 'text-emerald-300' : 'text-sky-400'} font-num">
+                ${rate}%
+              </span>
+            </div>
+
+            <div class="mt-2 mb-1.5 font-black text-lg sm:text-xl text-slate-100 truncate ${editableClass}"
+                 data-field="name" data-index="${index}" 
+                 contenteditable="${state.isEditMode}" 
+                 onblur="updateStudentText(event, ${index}, 'name')">
+              ${student.name}
+            </div>
+
+            ${tasksHtml}
+          </div>
+
+          <!-- Individual Progress Bar -->
+          <div class="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden mt-2 border border-slate-800">
+            <div class="h-full transition-all duration-300 ${isAllDone ? 'bg-emerald-400 shadow-sm shadow-emerald-400' : 'bg-sky-500'}" style="width: ${rate}%"></div>
+          </div>
+        `;
+
+        grid.appendChild(card);
+      });
+    }
+
+    function renderTodayTasks() {
+      const container = document.getElementById('today-tasks-container');
+      const emptyTip = document.getElementById('empty-tasks-tip');
+      container.innerHTML = '';
+
+      if (state.todayTasks.length === 0) {
+        if (emptyTip) emptyTip.classList.remove('hidden');
+        return;
+      }
+
+      if (emptyTip) emptyTip.classList.add('hidden');
+
+      state.todayTasks.forEach(taskName => {
+        const pill = document.createElement('div');
+        pill.className = 'bg-sky-600/40 border-2 border-sky-400 text-sky-100 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black flex items-center gap-2.5 shadow-md';
+        
+        const removeBtnHtml = state.isTaskPanelLocked 
+          ? `<span class="text-xs text-sky-300/70" title="防誤觸鎖定中"><i class="fa-solid fa-lock"></i></span>`
+          : `<button onclick="removeTodayTask('${taskName}')" title="移除任務" class="text-sky-200 hover:text-rose-400 transition ml-1 p-1 touch-target flex items-center justify-center">
+               <i class="fa-solid fa-xmark text-base"></i>
+             </button>`;
+
+        pill.innerHTML = `
+          <span>+ ${taskName}</span>
+          ${removeBtnHtml}
+        `;
+        container.appendChild(pill);
+      });
+    }
+
+    function renderPresetLibrary() {
+      const container = document.getElementById('preset-library-container');
+      container.innerHTML = '';
+
+      state.presetTasks.forEach(taskName => {
+        const isAdded = state.todayTasks.includes(taskName);
+        const btn = document.createElement('button');
+        btn.onclick = () => guardedAddTodayTask(taskName);
+        btn.disabled = isAdded;
+        btn.className = `px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition border-2 flex items-center gap-2 active:scale-95 touch-target ${
+          isAdded
+            ? 'bg-slate-900/60 text-slate-600 border-slate-800 cursor-not-allowed opacity-40'
+            : state.isTaskPanelLocked
+              ? 'bg-slate-800/90 text-slate-300 border-slate-700 hover:border-amber-400 hover:text-amber-200 shadow-md'
+              : 'bg-slate-800 hover:bg-sky-900/60 text-slate-100 hover:text-sky-100 border-slate-700 hover:border-sky-400 shadow-md'
+        }`;
+        btn.innerHTML = `<span>+ ${taskName}</span>`;
+        container.appendChild(btn);
+      });
+    }
+
+    // Toggle Anti-Accidental Touch Lock
+    function toggleTaskPanelLock() {
+      state.isTaskPanelLocked = !state.isTaskPanelLocked;
+      updateTaskLockUI();
+      renderTodayTasks();
+      renderPresetLibrary();
+      
+      if (state.isTaskPanelLocked) {
+        showToast("🔒 任務防誤觸已鎖定（保護今日作業清單）");
+      } else {
+        showToast("🔓 任務欄已解鎖（可增刪與編輯任務）");
+      }
+    }
+
+    function updateTaskLockUI() {
+      const lockBtn = document.getElementById('task-lock-btn');
+      const lockIcon = document.getElementById('task-lock-icon');
+      const lockText = document.getElementById('task-lock-text');
+      const badge = document.getElementById('lock-status-badge');
+      const customInput = document.getElementById('custom-task-input');
+      const addCustomBtn = document.getElementById('btn-add-custom');
+      const clearTodayBtn = document.getElementById('btn-clear-today');
+
+      if (!lockBtn) return;
+
+      if (state.isTaskPanelLocked) {
+        lockBtn.className = "px-4 py-2 text-xs sm:text-sm font-black rounded-xl transition flex items-center gap-2 shadow-lg bg-emerald-950 text-emerald-200 border-2 border-emerald-500/70 hover:bg-emerald-900 touch-target";
+        if (lockIcon) lockIcon.className = "fa-solid fa-lock";
+        if (lockText) lockText.textContent = "解鎖編輯任務";
+
+        if (badge) {
+          badge.className = "text-xs sm:text-sm font-black px-3 py-1.5 rounded-xl flex items-center gap-2 border-2 bg-amber-950/70 text-amber-300 border-amber-500/60 shadow-sm";
+          badge.innerHTML = `<i class="fa-solid fa-shield-halved text-amber-400"></i> 防誤觸保護中`;
+        }
+
+        if (customInput) customInput.disabled = true;
+        if (addCustomBtn) addCustomBtn.disabled = true;
+        if (clearTodayBtn) clearTodayBtn.disabled = true;
+      } else {
+        lockBtn.className = "px-4 py-2 text-xs sm:text-sm font-black rounded-xl transition flex items-center gap-2 shadow-lg bg-amber-500 text-slate-950 border-2 border-amber-300 hover:bg-amber-400 touch-target";
+        if (lockIcon) lockIcon.className = "fa-solid fa-lock-open";
+        if (lockText) lockText.textContent = "鎖定任務欄";
+
+        if (badge) {
+          badge.className = "text-xs sm:text-sm font-black px-3 py-1.5 rounded-xl flex items-center gap-2 border-2 bg-emerald-950/70 text-emerald-300 border-emerald-500/60 shadow-sm";
+          badge.innerHTML = `<i class="fa-solid fa-pen-ruler text-emerald-400"></i> 編輯模式開放中`;
+        }
+
+        if (customInput) customInput.disabled = false;
+        if (addCustomBtn) addCustomBtn.disabled = false;
+        if (clearTodayBtn) clearTodayBtn.disabled = false;
+      }
+    }
+
+    function guardedAddTodayTask(taskName) {
+      if (state.isTaskPanelLocked) {
+        showToast("⚠️ 任務欄防誤觸鎖定中！請先點擊「解鎖編輯任務」");
+        return;
+      }
+      addTodayTask(taskName);
+    }
+
+    function guardedAddCustomTask() {
+      if (state.isTaskPanelLocked) {
+        showToast("⚠️ 任務欄防誤觸鎖定中！請先點擊「解鎖編輯任務」");
+        return;
+      }
+      addCustomTask();
+    }
+
+    function guardedClearTodayTasks() {
+      if (state.isTaskPanelLocked) {
+        showToast("⚠️ 任務欄防誤觸鎖定中！請先點擊「解鎖編輯任務」");
+        return;
+      }
+      clearTodayTasks();
+    }
+
+    function guardedSelectAllTasks() {
+      selectAllTasks();
+    }
+
+    function guardedUnselectAllTasks() {
+      unselectAllTasks();
+    }
+
+    function toggleStudentTask(studentId, taskName) {
+      const student = state.students.find(s => s.id === studentId);
+      if (!student) return;
+
+      const idx = student.completedTasks.indexOf(taskName);
+      if (idx > -1) {
+        student.completedTasks.splice(idx, 1);
+      } else {
+        student.completedTasks.push(taskName);
+      }
+
+      saveState();
+      renderStudentGrid();
+      updateProgressMetrics();
+    }
+
+    function addTodayTask(taskName) {
+      if (!taskName || state.todayTasks.includes(taskName)) return;
+      state.todayTasks.push(taskName);
+      state.hasPlayed100Celebration = false;
+      saveState();
+      renderAll();
+      showToast(`已將「${taskName}」加入今日任務`);
+    }
+
+    function removeTodayTask(taskName) {
+      if (state.isTaskPanelLocked) {
+        showToast("⚠️ 任務欄已鎖定！請先解鎖後再移除作業");
+        return;
+      }
+      state.todayTasks = state.todayTasks.filter(t => t !== taskName);
+      state.hasPlayed100Celebration = false;
+      saveState();
+      renderAll();
+      showToast(`已自今日任務移除「${taskName}」`);
+    }
+
+    function addCustomTask() {
+      const input = document.getElementById('custom-task-input');
+      const value = input.value.trim();
+      if (!value) return;
+
+      if (!state.presetTasks.includes(value)) {
+        state.presetTasks.push(value);
+      }
+      addTodayTask(value);
+      input.value = '';
+    }
+
+    function selectAllTasks() {
+      if (state.todayTasks.length === 0) {
+        showToast("請先將作業加入今日任務！");
+        return;
+      }
+      state.students.forEach(s => {
+        s.completedTasks = [...state.todayTasks];
+      });
+      saveState();
+      renderAll();
+      showToast("已將全班所有座號標記為完成！");
+    }
+
+    function unselectAllTasks() {
+      state.students.forEach(s => {
+        s.completedTasks = [];
+      });
+      state.hasPlayed100Celebration = false;
+      saveState();
+      renderAll();
+      showToast("已清空所有勾選！");
+    }
+
+    function clearTodayTasks() {
+      state.todayTasks = [];
+      state.hasPlayed100Celebration = false;
+      state.students.forEach(s => {
+        s.completedTasks = [];
+      });
+      saveState();
+      renderAll();
+      showToast("已清空今日任務清單");
+    }
+
+    // Progress Metric & 100% Celebration Trigger
+    function updateProgressMetrics() {
+      const totalStudents = state.students.length;
+      const totalTodayTasks = state.todayTasks.length;
+      const rateCard = document.getElementById('class-rate-card');
+
+      if (totalStudents === 0 || totalTodayTasks === 0) {
+        setRateDisplay(0);
+        if (rateCard) rateCard.classList.remove('glass-card-complete');
+        state.hasPlayed100Celebration = false;
+        return;
+      }
+
+      let totalCompletedPoints = 0;
+      state.students.forEach(s => {
+        const count = s.completedTasks.filter(t => state.todayTasks.includes(t)).length;
+        totalCompletedPoints += count;
+      });
+
+      const maxPossiblePoints = totalStudents * totalTodayTasks;
+      const overallRate = Math.round((totalCompletedPoints / maxPossiblePoints) * 100);
+
+      setRateDisplay(overallRate);
+
+      // Trigger Celebration when reaching 100%
+      if (overallRate === 100 && totalTodayTasks > 0) {
+        if (rateCard) rateCard.classList.add('glass-card-complete');
+        if (!state.hasPlayed100Celebration) {
+          state.hasPlayed100Celebration = true;
+          triggerCelebrationEffects();
+        }
+      } else {
+        if (rateCard) rateCard.classList.remove('glass-card-complete');
+        state.hasPlayed100Celebration = false;
+      }
+    }
+
+    function setRateDisplay(rate) {
+      const el = document.getElementById('class-rate-text');
+      if (el) el.textContent = rate;
+    }
+
+    function toggleEditMode() {
+      state.isEditMode = !state.isEditMode;
+      const btn = document.getElementById('edit-mode-btn');
+      
+      if (state.isEditMode) {
+        btn.classList.remove('bg-amber-950/90', 'text-amber-100');
+        btn.classList.add('bg-amber-500', 'text-slate-950', 'ring-2', 'ring-amber-300');
+        btn.innerHTML = `<i class="fa-solid fa-floppy-disk"></i>`;
+        showToast("已開啟編修模式！點擊座號或姓名可直接修改");
+      } else {
+        btn.classList.add('bg-amber-950/90', 'text-amber-100');
+        btn.classList.remove('bg-amber-500', 'text-slate-950', 'ring-2', 'ring-amber-300');
+        btn.innerHTML = `<i class="fa-solid fa-pen-to-square"></i>`;
+        saveState();
+        showToast("已儲存編修結果！");
+      }
+
+      renderAll();
+    }
+
+    function updateEditBanner() {
+      const banner = document.getElementById('edit-banner');
+      const countEl = document.getElementById('banner-student-count');
+      if (countEl) countEl.textContent = state.students.length;
+      if (!banner) return;
+      if (state.isEditMode) {
+        banner.classList.remove('hidden');
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    function updateStudentText(event, index, field) {
+      if (!state.isEditMode) return;
+      let text = event.target.innerText.trim();
+      text = text.replace(/學生\s*/g, '');
+
+      if (state.students[index]) {
+        if (text === '') {
+          event.target.innerText = field === 'number' ? String(index + 1).padStart(2, '0') : `${index + 1}號`;
+          state.students[index][field] = event.target.innerText;
+        } else {
+          event.target.innerText = text;
+          state.students[index][field] = text;
+        }
+        saveState();
+      }
+    }
+
+    function openStudentCountModal() {
+      const input = document.getElementById('student-count-input');
+      if (input) input.value = state.students.length;
+      document.getElementById('student-count-modal').classList.remove('hidden');
+    }
+
+    function closeStudentCountModal() {
+      document.getElementById('student-count-modal').classList.add('hidden');
+    }
+
+    function setQuickCount(val) {
+      const input = document.getElementById('student-count-input');
+      if (input) input.value = val;
+    }
+
+    function applyStudentCount() {
+      const input = document.getElementById('student-count-input');
+      const targetCount = parseInt(input.value, 10);
+
+      if (isNaN(targetCount) || targetCount < 1 || targetCount > 50) {
+        showToast("請輸入 1 至 50 之間的有效人數！");
+        return;
+      }
+
+      adjustStudentCount(targetCount);
+      closeStudentCountModal();
+    }
+
+    function adjustStudentCount(targetCount) {
+      const currentCount = state.students.length;
+
+      if (targetCount === currentCount) {
+        showToast(`班級人數已為 ${targetCount} 人`);
+        return;
+      }
+
+      if (targetCount > currentCount) {
+        for (let i = currentCount + 1; i <= targetCount; i++) {
+          state.students.push({
+            id: Date.now() + i,
+            number: String(i).padStart(2, '0'),
+            name: `${i}號`,
+            completedTasks: []
+          });
+        }
+      } else {
+        state.students = state.students.slice(0, targetCount);
+      }
+
+      state.totalStudents = targetCount;
+      saveState();
+      renderAll();
+      showToast(`已成功將班級人數調整為 ${targetCount} 人`);
+    }
+
+    function addStudent() {
+      const newId = state.students.length + 1;
+      if (newId > 50) {
+        showToast("已達人數上限 (50人)！");
+        return;
+      }
+      state.students.push({
+        id: Date.now(),
+        number: String(newId).padStart(2, '0'),
+        name: `${newId}號`,
+        completedTasks: []
+      });
+      state.totalStudents = state.students.length;
+      saveState();
+      renderAll();
+      showToast(`已新增座號 ${newId}號`);
+    }
+
+    function removeLastStudent() {
+      if (state.students.length <= 1) {
+        showToast("至少需保留一個座號！");
+        return;
+      }
+      const removed = state.students.pop();
+      state.totalStudents = state.students.length;
+      saveState();
+      renderAll();
+      showToast(`已移除最後一位 (${removed.name})`);
+    }
+
+    function openResetModal() {
+      const desc = document.getElementById('reset-modal-desc');
+      if (desc) {
+        desc.textContent = `這將清空全班 ${state.students.length} 位座號所有作業紀錄。建議在新的一天開始時使用。`;
+      }
+      document.getElementById('reset-modal').classList.remove('hidden');
+    }
+
+    function closeResetModal() {
+      document.getElementById('reset-modal').classList.add('hidden');
+    }
+
+    function confirmResetAll() {
+      state.todayTasks = [];
+      state.hasPlayed100Celebration = false;
+      generateDefaultStudents(state.totalStudents || DEFAULT_STUDENT_COUNT);
+      saveState();
+      closeResetModal();
+      renderAll();
+      showToast("作業紀錄與任務狀態已完全重設");
+    }
+
+    function toggleFullscreen() {
+      const body = document.getElementById('app-body');
+      const icon = document.getElementById('fullscreen-icon');
+
+      if (!document.fullscreenElement && !body.classList.contains('pseudo-fullscreen-mode')) {
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().then(() => {
+            if (icon) icon.className = "fa-solid fa-compress";
+          }).catch(() => {
+            body.classList.add('pseudo-fullscreen-mode');
+            if (icon) icon.className = "fa-solid fa-compress";
+            showToast("已切換至全螢幕模式");
+          });
+        } else {
+          body.classList.add('pseudo-fullscreen-mode');
+          if (icon) icon.className = "fa-solid fa-compress";
+          showToast("已切換至全螢幕模式");
+        }
+      } else {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().then(() => {
+            if (icon) icon.className = "fa-solid fa-expand";
+          }).catch(() => {});
+        }
+        body.classList.remove('pseudo-fullscreen-mode');
+        if (icon) icon.className = "fa-solid fa-expand";
+        showToast("已結束全螢幕模式");
+      }
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+      const icon = document.getElementById('fullscreen-icon');
+      if (icon) {
+        icon.className = document.fullscreenElement ? "fa-solid fa-compress" : "fa-solid fa-expand";
+      }
+    });
+
+    // Non-blocking Toast Notification
+    let toastTimer = null;
+    function showToast(msg) {
+      const toast = document.getElementById('toast-message');
+      const text = document.getElementById('toast-text');
+      if (!toast || !text) return;
+      text.textContent = msg;
+
+      toast.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+      }, 2600);
+    }
+  </script>
+</body>
+</html>
